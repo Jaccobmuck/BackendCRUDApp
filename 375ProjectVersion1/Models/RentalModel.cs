@@ -7,8 +7,10 @@ namespace _375ProjectVersion1.Models
     {
         [Key]
         public Int64 RentalId { get; set; }
-        public Int64? CustomerId { get; set; }
-        public Int64? MovieId { get; set; }
+        [ForeignKey("Customer")]
+        public Int64 CustomerId { get; set; }
+        [ForeignKey("Movie")]
+        public Int64 MovieId { get; set; }
         public DateTime? RentDate { get; set; }
         public DateTime ReturnDate { get; set; }
     }
