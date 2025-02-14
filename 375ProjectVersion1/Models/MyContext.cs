@@ -11,9 +11,9 @@ namespace _375ProjectVersion1.Models
         {
             optionsBuilder.UseSqlServer(connectionString);
         }
-        public DbSet<MovieModel> Movies { get; set; }   
-        public DbSet<CustomerModel> Customers { get; set; }
-        public DbSet<RentalModel> Rentals { get; set; }  
+        public DbSet<MovieModel> Movie { get; set; }   
+        public DbSet<CustomerModel> Customer { get; set; }
+        public DbSet<RentalModel> Rental { get; set; }  
 
     }
 }
