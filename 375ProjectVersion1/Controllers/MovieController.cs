@@ -60,9 +60,17 @@ namespace _375ProjectVersion1.Controllers
         {
             try
             {
+                Console.WriteLine("updating the user with the id: ", id);
                 using (MyContext db = new MyContext())
                 {
-                    MovieModel model = new MovieModel(); // creates an object for the movie model to update similarly to "postItems" function
+                    MovieModel model = await db.Movie.FirstOrDefaultAsync(x => x.MovieId == id);
+                    // creates an object for the movie model to update similarly to "postItems" function
+                    // mapping it to the id at the first or default id that matches
+                    if (model == null)
+                    {
+                        Console.WriteLine("Id ", id, " Not found");
+                        return NotFound(id);
+                    }
 
                     model.Title = value.Title;
                     model.Genre = value.Genre;

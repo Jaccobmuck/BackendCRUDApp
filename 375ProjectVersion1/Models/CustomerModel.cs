@@ -9,6 +9,6 @@ namespace _375ProjectVersion1.Models
         public string? Name {  get; set; }
         public string? Email { get; set; }
         public string? Phone { get; set; }     
-        public string? MembershipDate { get; set; }
+        public DateTime? MembershipDate { get; set; }
     }
 }
