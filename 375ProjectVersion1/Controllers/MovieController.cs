@@ -5,114 +5,110 @@ using Microsoft.EntityFrameworkCore;
 namespace _375ProjectVersion1.Controllers
 {
     [ApiController]
-    [Route("/[controller]")]
+    [Route("[controller]")]
     public class MovieController : ControllerBase
     {
+        private readonly MyContext _db;
+        private readonly ILogger<MovieController> _logger;
+
+        public MovieController(MyContext db, ILogger<MovieController> logger)
+        {
+            _db = db;
+            _logger = logger;
+        }
+
+        // GET: /movies
         [HttpGet("[action]")]
-        public IActionResult getItems()
+        public async Task<IActionResult> GetMovies()
         {
             try
             {
-                using (MyContext db = new MyContext())
-                {
-                    List<MovieModel> Movie = db.Movie.ToList();
-
-                    return new ObjectResult(Movie);
-                }
+                var movies = await _db.Movie.ToListAsync();
+                return Ok(movies);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Caught an exception: ", e.Message, "Stack Trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error fetching movies.");
+                return StatusCode(500, "Internal Server Error");
             }
         }
 
+        // POST: /movies
         [HttpPost("[action]")]
-        public async Task<IActionResult> postItem([FromBody] MovieModel value)
+        public async Task<IActionResult> CreateMovie([FromBody] MovieModel value)
         {
+            if (value == null)
+                return BadRequest("Movie data cannot be null.");
+
             try
             {
-                using (MyContext db = new MyContext())
+                var model = new MovieModel
                 {
-                    // creates a movie model object to be able to add items to the db
-                    MovieModel model = new MovieModel();
+                    Title = value.Title,
+                    Genre = value.Genre,
+                    ReleaseYear = value.ReleaseYear,
+                    Director = value.Director
+                };
 
-                    // mapping the input value to the model object
-                    model.Title = value.Title;
-                    model.Genre = value.Genre;
-                    model.ReleaseYear = value.ReleaseYear;
-                    model.Director = value.Director;
+                _db.Movie.Add(model);
+                await _db.SaveChangesAsync();
 
-                    db.Movie.Add(model);
-                    await db.SaveChangesAsync();
-
-                    return new ObjectResult(model);
-                }
+                return CreatedAtAction(nameof(GetMovies), new { id = model.MovieId }, model);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Caught an exception: ", e.Message, "Stack Trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error creating a movie.");
+                return StatusCode(500, "Internal Server Error");
             }
         }
-        [HttpPut("[action]/{id}")] // http action followed by the specified id that's being worked with
-        public async Task<IActionResult> updateItem([FromBody] MovieModel value, Int64 id) // id's are int64 in the model
+
+        // PUT: /movies/{id}
+        [HttpPut("[action]/{id}")]
+        public async Task<IActionResult> UpdateMovie([FromBody] MovieModel value, long id)
         {
+            if (value == null)
+                return BadRequest("Movie data cannot be null.");
+
             try
             {
-                Console.WriteLine("updating the user with the id: ", id);
-                using (MyContext db = new MyContext())
-                {
-                    MovieModel model = await db.Movie.FirstOrDefaultAsync(x => x.MovieId == id);
-                    // creates an object for the movie model to update similarly to "postItems" function
-                    // mapping it to the id at the first or default id that matches
-                    if (model == null)
-                    {
-                        Console.WriteLine("Id ", id, " Not found");
-                        return NotFound(id);
-                    }
+                var movie = await _db.Movie.FindAsync(id);
+                if (movie == null)
+                    return NotFound($"Movie with ID {id} not found.");
 
-                    model.Title = value.Title;
-                    model.Genre = value.Genre;
-                    model.ReleaseYear = value.ReleaseYear;
-                    model.Director = value.Director;
+                movie.Title = value.Title;
+                movie.Genre = value.Genre;
+                movie.ReleaseYear = value.ReleaseYear;
+                movie.Director = value.Director;
 
-                    db.Movie.Update(model);
-                    await db.SaveChangesAsync();
-
-                    return new ObjectResult(model);
-                }
+                await _db.SaveChangesAsync();
+                return Ok(movie);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Caught exception: ", e.Message, "Stack trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error updating movie with ID {Id}", id);
+                return StatusCode(500, "Internal Server Error");
             }
         }
+
+        // DELETE: /movies/{id}
         [HttpDelete("[action]/{id}")]
-        public async Task<IActionResult> deleteItem(Int64 id)
+        public async Task<IActionResult> DeleteMovie(long id)
         {
             try
             {
-                using(MyContext db = new MyContext())
-                {
-                    MovieModel movie = await db.Movie.FirstOrDefaultAsync(n => n.MovieId == id);
-                    if(movie != null)
-                    {
-                        Console.WriteLine("deleting item: " + movie);
-                        db.Movie.Remove(movie);
-                        await db.SaveChangesAsync();
-                    }
-                    Console.WriteLine("The item doesn't exist or was already deleted");
-                    return new OkResult();
-                }
+                var movie = await _db.Movie.FindAsync(id);
+                if (movie == null)
+                    return NotFound($"Movie with ID {id} not found.");
+
+                _db.Movie.Remove(movie);
+                await _db.SaveChangesAsync();
+                return NoContent();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                Console.WriteLine("Caught exception: ", e.Message, "Stack Trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error deleting movie with ID {Id}", id);
+                return StatusCode(500, "Internal Server Error");
             }
         }
-
     }
 }

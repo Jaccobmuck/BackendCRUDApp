@@ -5,118 +5,110 @@ using Microsoft.EntityFrameworkCore;
 namespace _375ProjectVersion1.Controllers
 {
     [ApiController]
-    [Route("/[controller]")]
-    public class RentalController:ControllerBase
+    [Route("[controller]")]
+    public class RentalController : ControllerBase
     {
+        private readonly MyContext _db;
+        private readonly ILogger<RentalController> _logger;
+
+        public RentalController(MyContext db, ILogger<RentalController> logger)
+        {
+            _db = db;
+            _logger = logger;
+        }
+
         [HttpGet("[action]")]
-        public IActionResult getItems()
+        public async Task<IActionResult> GetItems()
         {
             try
             {
-                using (MyContext db = new MyContext())
-                {
-                    List<RentalModel> rentals = db.Rental.ToList();
-
-                    return new ObjectResult(rentals);
-                }
+                var rentals = await _db.Rental.ToListAsync();
+                return Ok(rentals);
             }
             catch (Exception e)
             {
-                Console.WriteLine("caught exception:", e.Message, "Stack trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error fetching rental items");
+                return StatusCode(500, "Internal Server Error");
             }
         }
+
         [HttpPost("[action]")]
-        public async Task<IActionResult> postItem([FromBody] RentalModel value, Int64 customerId, Int64 movieId)
+        public async Task<IActionResult> PostItem([FromBody] RentalModel value, long customerId, long movieId)
         {
+            if (value == null) return BadRequest("Rental data cannot be null.");
+
             try
             {
-                using (MyContext db = new MyContext())
+                var customer = await _db.Customer.FindAsync(customerId);
+                var movie = await _db.Movie.FindAsync(movieId);
+
+                if (customer == null || movie == null)
+                    return NotFound("Customer or Movie ID not found");
+
+                var model = new RentalModel
                 {
-                    RentalModel model = new RentalModel();
-                    // allows us to search for the id in the primary key table to see if it exists
-                    CustomerModel customer = await db.Customer.FirstOrDefaultAsync(x => x.CustomerId == customerId);
-                    MovieModel movie = await db.Movie.FirstOrDefaultAsync(x => x.MovieId == movieId);
+                    CustomerId = value.CustomerId,
+                    MovieId = value.MovieId,
+                    RentDate = value.RentDate,
+                    ReturnDate = value.ReturnDate
+                };
 
-                    if (customer == null || movie == null) {
-                        // both ids (MovieId and CustomerId) need to exist or else you cannot add data into the rental table
-                        Console.WriteLine("One or both of the MovieId or CustomerID does not exist");
-                        return NotFound();
-                    }
-                    model.CustomerId = value.CustomerId;
-                    model.MovieId = value.MovieId;
-                    model.RentDate = value.RentDate;
-                    model.ReturnDate = value.ReturnDate;
-
-                    db.Rental.Add(model);
-                    await db.SaveChangesAsync();
-
-                    return new ObjectResult(model);
-                }
+                _db.Rental.Add(model);
+                await _db.SaveChangesAsync();
+                return CreatedAtAction(nameof(GetItems), new { id = model.RentalId }, model);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Caught exception: ", e.Message, "Stack trace: ", e.StackTrace);
-                return BadRequest(e);   
+                _logger.LogError(e, "Error creating rental");
+                return StatusCode(500, "Internal Server Error");
             }
         }
+
         [HttpPut("[action]/{rentalId}")]
-        public async Task<IActionResult> updateItem([FromBody] RentalModel value,Int64 rentalId, Int64 customerId, Int64 movieId)
+        public async Task<IActionResult> UpdateItem([FromBody] RentalModel value, long rentalId, long customerId, long movieId)
         {
+            if (value == null) return BadRequest("Rental data cannot be null.");
+
             try
             {
-                using (MyContext db = new MyContext()) 
-                { 
-                    RentalModel model = await db.Rental.FirstOrDefaultAsync(x => x.RentalId == rentalId);
-                    CustomerModel customer = await db.Customer.FirstOrDefaultAsync(x=> x.CustomerId == customerId);
-                    MovieModel movie = await db.Movie.FirstOrDefaultAsync(x => x.MovieId == movieId);
+                var rental = await _db.Rental.FindAsync(rentalId);
+                var customer = await _db.Customer.FindAsync(customerId);
+                var movie = await _db.Movie.FindAsync(movieId);
 
-                    if (model == null || customerId == null || movieId == null)
-                    {
-                        Console.WriteLine("The rental, customer, or movie id does not exist");
-                        return NotFound();
-                    }
+                if (rental == null || customer == null || movie == null)
+                    return NotFound("Rental, Customer, or Movie not found");
 
-                    model.CustomerId = value.CustomerId;
-                    model.MovieId = value.MovieId;
-                    model.RentDate = value.RentDate;
-                    model.ReturnDate = value.ReturnDate;
+                rental.CustomerId = value.CustomerId;
+                rental.MovieId = value.MovieId;
+                rental.RentDate = value.RentDate;
+                rental.ReturnDate = value.ReturnDate;
 
-                    db.Rental.Update(model);
-                    await db.SaveChangesAsync();
-
-                    return new ObjectResult(model);
-                }
+                await _db.SaveChangesAsync();
+                return Ok(rental);
             }
             catch (Exception e)
             {
-                Console.WriteLine("caught exception: ", e.Message, "stack trace: ", e.StackTrace);
-                return BadRequest(e);
+                _logger.LogError(e, "Error updating rental");
+                return StatusCode(500, "Internal Server Error");
             }
         }
-        [HttpDelete("[action]/{id}")]
-        public async Task<IActionResult> deleteItem(int id)
+
+        [HttpDelete("([action]/{id}")]
+        public async Task<IActionResult> DeleteItem(long id)
         {
             try
             {
-                using (MyContext db = new MyContext())
-                {
-                    RentalModel rental = await db.Rental.FirstOrDefaultAsync(x => x.RentalId == id);
+                var rental = await _db.Rental.FindAsync(id);
+                if (rental == null) return NotFound();
 
-                    if (rental == null) 
-                    {
-                        Console.WriteLine("The id entered doesn't exist: ", id);
-                    }
-                    Console.WriteLine("deleting the rental with the id: ", id);
-                    db.Rental.Remove(rental);
-                    await db.SaveChangesAsync();
-                    return Ok();
-                }
+                _db.Rental.Remove(rental);
+                await _db.SaveChangesAsync();
+                return NoContent();
             }
-            catch (Exception e) 
-            { 
-                Console.WriteLine("caught exception: ", e.Message, "stack trace: ", e.StackTrace);
-                return BadRequest(e);
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error deleting rental");
+                return StatusCode(500, "Internal Server Error");
             }
         }
     }
