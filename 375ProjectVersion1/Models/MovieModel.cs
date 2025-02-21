@@ -13,4 +13,4 @@ namespace _375ProjectVersion1.Models
         public string? Director { get; set; }
 
     }
-}
+}   
